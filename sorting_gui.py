@@ -1,346 +1,281 @@
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+import customtkinter as ctk
+from tkinter import messagebox, filedialog
+import subprocess
 import time
 import tracemalloc
-import csv
+import re
 import matplotlib.pyplot as plt
-from dataset_generator import generate_room_names
 
-# Sorting algorithms
+# Pastikan file dataset_generator.py ada di folder yang sama
+try:
+    from dataset_generator import generate_room_names
+except ImportError:
+    def generate_room_names(n):
+        # Fallback sederhana jika file generator tidak ditemukan
+        import random
+        prefixes = ["Ruang", "Lab", "A", "B", "R"]
+        return [f"{random.choice(prefixes)}.{random.randint(1, 500)}" for _ in range(n)]
 
-def merge_sort(arr):
-    if len(arr) <= 1:
-        return arr[:]
+# --- Konfigurasi Tema ---
+ctk.set_appearance_mode("dark")  
+ctk.set_default_color_theme("blue") 
+
+# --- FUNGSI PEMBANDING (NATURAL SORTING) ---
+def natural_keys(text):
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', text)]
+
+# --- ALGORITMA SORTING ---
+def merge_sort_recursive(arr):
+    if len(arr) <= 1: return arr[:]
     mid = len(arr) // 2
-    left = merge_sort(arr[:mid])
-    right = merge_sort(arr[mid:])
+    left = merge_sort_recursive(arr[:mid])
+    right = merge_sort_recursive(arr[mid:])
     i = j = 0
     merged = []
     while i < len(left) and j < len(right):
-        if left[i] <= right[j]:
+        if natural_keys(left[i]) <= natural_keys(right[j]):
             merged.append(left[i]); i += 1
         else:
             merged.append(right[j]); j += 1
-    merged.extend(left[i:])
-    merged.extend(right[j:])
+    merged.extend(left[i:]); merged.extend(right[j:])
     return merged
 
 def merge_sort_iterative(arr):
     n = len(arr)
-    if n <= 1:
-        return arr[:]
+    if n <= 1: return arr[:]
     result = arr[:]
     width = 1
     while width < n:
         for i in range(0, n, 2 * width):
-            left = result[i:i+width]
-            right = result[i+width:i+2*width]
+            left = result[i : i + width]
+            right = result[i + width : i + 2 * width]
             li = ri = 0
             merged = []
             while li < len(left) and ri < len(right):
-                if left[li] <= right[ri]:
+                if natural_keys(left[li]) <= natural_keys(right[ri]):
                     merged.append(left[li]); li += 1
                 else:
                     merged.append(right[ri]); ri += 1
-            merged.extend(left[li:])
-            merged.extend(right[ri:])
-            result[i:i+2*width] = merged
+            merged.extend(left[li:]); merged.extend(right[ri:])
+            result[i : i + len(merged)] = merged
         width *= 2
     return result
 
-
-# Globals for experiment history
-
+# --- GLOBAL HISTORY UNTUK GRAFIK ---
 history_n = []
 history_time_iter = []
 history_time_rec = []
 
-
-# Measurement helper
-
-def measure_function(func, *args, **kwargs):
-    """
-    Returns tuple (result, elapsed_seconds, peak_kb).
-    Uses tracemalloc to measure peak memory during function execution.
-    """
+def measure_function(func, *args):
     tracemalloc.start()
     start = time.perf_counter()
-    result = func(*args, **kwargs)
+    result = func(*args)
     elapsed = time.perf_counter() - start
-    current, peak = tracemalloc.get_traced_memory()
+    _, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
-    peak_kb = peak / 1024.0
-    return result, elapsed, peak_kb
+    return result, elapsed, peak / 1024.0
 
-
-# Plot & Analysis functions (module-level)
-
-def show_plot():
-    if not history_n:
-        messagebox.showerror("Error", "Belum ada data perbandingan. Jalankan Compare Both terlebih dahulu.")
-        return
-    plt.figure(figsize=(8,4.5))
-    plt.plot(history_n, history_time_iter, marker='o', label="Iteratif (Merge Sort)")
-    plt.plot(history_n, history_time_rec, marker='o', label="Rekursif (Merge Sort)")
-    plt.title("Perbandingan Running Time")
-    plt.xlabel("Jumlah Data (n)")
-    plt.ylabel("Waktu Eksekusi (detik)")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-def show_analysis():
-    if not history_n:
-        messagebox.showerror("Error", "Belum ada data untuk dianalisis.")
-        return
-
-    avg_iter = sum(history_time_iter) / len(history_time_iter)
-    avg_rec = sum(history_time_rec) / len(history_time_rec)
-
-    if avg_rec < avg_iter:
-        faster = "Rekursif Merge Sort lebih cepat rata-rata."
-    elif avg_rec > avg_iter:
-        faster = "Iteratif Merge Sort lebih cepat rata-rata."
-    else:
-        faster = "Keduanya memiliki kecepatan rata-rata yang sama."
-
-    analysis_text = (
-        f"Jumlah percobaan : {len(history_n)} kali\n\n"
-        f"Rata-rata waktu Iteratif : {avg_iter:.6f} detik\n"
-        f"Rata-rata waktu Rekursif : {avg_rec:.6f} detik\n\n"
-        f"Kesimpulan:\n{faster}\n\n"
-        f"Catatan: perbedaan cenderung meningkat seiring bertambahnya n."
-    )
-    messagebox.showinfo("Analisis Perbandingan", analysis_text)
-
-# reset histori perbandingan (module-level)
-def reset_history():
-    global history_n, history_time_iter, history_time_rec
-    history_n.clear()
-    history_time_iter.clear()
-    history_time_rec.clear()
-    # Try clearing the textbox if app exists
-    try:
-        app.txt_result.delete("1.0", tk.END)
-    except Exception:
-        pass
-    messagebox.showinfo("Reset History", "History running time dan analisis sudah direset.\nSilakan mulai eksperimen dari awal.")
-
-# GUI App
-
-class SortingApp:
-    def __init__(self, root):
-        self.root = root
-        root.title("Analisis Efisiensi: Iteratif vs Rekursif (Sorting)")
-        root.geometry("920x640")
-
-        # Frame input
-        frm_input = ttk.LabelFrame(root, text="Input Data Nama Ruangan")
-        frm_input.pack(fill="x", padx=8, pady=6)
-
-        ttk.Label(frm_input, text="Masukkan (pisah koma):").grid(row=0, column=0, sticky="w")
-        self.entry = ttk.Entry(frm_input, width=88)
-        self.entry.grid(row=0, column=1, padx=6, pady=6, sticky="w")
-
-        ttk.Button(frm_input, text="Add (entry)", command=self.add_from_entry).grid(row=0, column=2, padx=4)
-        ttk.Button(frm_input, text="Load from file...", command=self.load_from_file).grid(row=0, column=3, padx=4)
-        ttk.Button(frm_input, text="Clear all", command=self.clear_all).grid(row=0, column=4, padx=4)
-
-        # Frame list & CRUD
-        frm_list = ttk.LabelFrame(root, text="Data (List)")
-        frm_list.pack(fill="both", expand=True, padx=8, pady=6)
-
-        columns = ("#1",)
-        self.tree = ttk.Treeview(frm_list, columns=columns, show="headings", height=16)
-        self.tree.heading("#1", text="Nama Ruangan")
-        self.tree.pack(side="left", fill="both", expand=True, padx=(6,0), pady=6)
-
-        vsb = ttk.Scrollbar(frm_list, orient="vertical", command=self.tree.yview)
-        vsb.pack(side="left", fill="y")
-        self.tree.configure(yscrollcommand=vsb.set)
-
-        frm_buttons = ttk.Frame(frm_list)
-        frm_buttons.pack(side="left", fill="y", padx=6)
-        ttk.Button(frm_buttons, text="Delete selected", command=self.delete_selected).pack(fill="x", pady=4)
-        ttk.Button(frm_buttons, text="Count", command=self.show_count).pack(fill="x", pady=4)
-
-        # Frame sorting controls
-        frm_sort = ttk.LabelFrame(root, text="Sorting & Pengukuran")
-        frm_sort.pack(fill="x", padx=8, pady=6)
-
-        ttk.Button(frm_sort, text="Run Iteratif (Merge Sort)", command=self.run_iterative).grid(row=0, column=0, padx=6, pady=6)
-        ttk.Button(frm_sort, text="Run Rekursif (Merge Sort)", command=self.run_recursive).grid(row=0, column=1, padx=6, pady=6)
-        ttk.Button(frm_sort, text="Compare Both (single run)", command=self.compare_both).grid(row=0, column=2, padx=6, pady=6)
-        ttk.Button(frm_sort, text="Export results to CSV", command=self.export_csv).grid(row=0, column=3, padx=6, pady=6)
-
-        # quick access for plot, analysis, reset
-        frm_extra = ttk.Frame(root)
-        frm_extra.pack(fill="x", padx=8, pady=(0,6))
-        ttk.Button(frm_extra, text="Tampilkan Grafik Running Time", command=show_plot).pack(side="left", padx=6)
-        ttk.Button(frm_extra, text="Tampilkan Analisis Perbandingan", command=show_analysis).pack(side="left", padx=6)
-        ttk.Button(frm_extra, text="Reset History", command=reset_history).pack(side="left", padx=6)
-        ttk.Button(frm_extra, text="Clear Hasil", command=self.clear_results).pack(side="left", padx=6)
-        ttk.Button(frm_extra, text="Reset TOTAL", command=self.clear_all_full).pack(side="left", padx=6)
-
-        # Frame generate dataset
-        frm_generate = ttk.LabelFrame(root, text="Generate Dataset Otomatis")
-        frm_generate.pack(fill="x", padx=8, pady=6)
-
-        ttk.Label(frm_generate, text="Jumlah data:").pack(side="left", padx=4)
-        self.entry_generate = ttk.Entry(frm_generate, width=12)
-        self.entry_generate.pack(side="left", padx=4)
-        ttk.Button(frm_generate, text="Generate", command=self.generate_dataset).pack(side="left", padx=4)
-
-        # Frame results
-        frm_result = ttk.LabelFrame(root, text="Hasil")
-        frm_result.pack(fill="both", expand=True, padx=8, pady=6)
-
-        self.txt_result = tk.Text(frm_result, height=14)
-        self.txt_result.pack(fill="both", expand=True, padx=6, pady=6)
-
-        # internal state
+class SortingAppModern(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("App: Perbandingan Algoritma Merge Sort(Rekursif vs Iteratif) Pada Data Nama Ruangan")
+        self.geometry("1100x900")
         self.data = []
+        
+        self.grid_columnconfigure(0, weight=1)
+        self.setup_ui()
 
-    # Methods
+    def setup_ui(self):
+        # 1. Header
+        self.header = ctk.CTkLabel(self, text="ANALISIS EFISIENSI ALGORITMA MERGE SORT: REKURSIF VS ITERATIF PADA DATA RUANGAN", 
+                                   font=ctk.CTkFont(size=22, weight="bold"), text_color="white")
+        self.header.grid(row=0, column=0, padx=20, pady=(20, 10))
 
+        # 2. Frame Input Data Manual
+        self.frm_input = ctk.CTkFrame(self)
+        self.frm_input.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+        
+        ctk.CTkLabel(self.frm_input, text="Input Data Nama Ruangan", text_color="white", 
+                     font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
+        
+        self.entry = ctk.CTkEntry(self.frm_input, placeholder_text="Contoh: Ruang 1, Ruang 2", width=450)
+        self.entry.grid(row=1, column=0, padx=10, pady=10)
+        
+        ctk.CTkButton(self.frm_input, text="Tambah Data", command=self.add_from_entry).grid(row=1, column=1, padx=5)
+        ctk.CTkButton(self.frm_input, text="Load File", command=self.load_from_file).grid(row=1, column=2, padx=5)
+        ctk.CTkButton(self.frm_input, text="Clear Dataset", fg_color="transparent", border_width=1, command=self.clear_all).grid(row=1, column=3, padx=5)
+
+        # 3. Frame Generator Dataset Otomatis
+        self.frm_gen = ctk.CTkFrame(self)
+        self.frm_gen.grid(row=2, column=0, padx=20, pady=10, sticky="nsew")
+        
+        ctk.CTkLabel(self.frm_gen, text="Generator Dataset Otomatis", text_color="white", 
+                     font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
+        
+        self.entry_gen = ctk.CTkEntry(self.frm_gen, placeholder_text="Masukkan jumlah n data", width=200)
+        self.entry_gen.grid(row=1, column=0, padx=10, pady=10, sticky="w")
+        
+        ctk.CTkButton(self.frm_gen, text="Generate Data", command=self.generate_dataset).grid(row=1, column=1, padx=5, sticky="w")
+
+        # 4. Frame Preview Data
+        self.frm_preview = ctk.CTkFrame(self)
+        self.frm_preview.grid(row=3, column=0, padx=20, pady=10, sticky="nsew")
+        
+        ctk.CTkLabel(self.frm_preview, text="Preview Data (Nama Ruangan)", text_color="white", 
+                     font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=10, pady=(5,0))
+        
+        self.textbox_preview = ctk.CTkTextbox(self.frm_preview, height=120)
+        self.textbox_preview.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # 5. Frame Sorting & Pengukuran
+        self.frm_ctrl = ctk.CTkFrame(self)
+        self.frm_ctrl.grid(row=4, column=0, padx=20, pady=10, sticky="nsew")
+        
+        ctk.CTkLabel(self.frm_ctrl, text="Sorting & Pengukuran", text_color="white", 
+                     font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w", columnspan=5)
+
+        ctk.CTkButton(self.frm_ctrl, text="Compare Both", command=self.compare_both).grid(row=1, column=0, padx=10, pady=10)
+        ctk.CTkButton(self.frm_ctrl, text="Tampilkan Grafik", command=self.show_plot).grid(row=1, column=1, padx=10)
+        ctk.CTkButton(self.frm_ctrl, text="Analisis Perbandingan", command=self.show_analysis).grid(row=1, column=2, padx=10)
+        ctk.CTkButton(self.frm_ctrl, text="Visualisasi Merge Sort", fg_color="#FFD700", text_color="black", command=self.open_visualization).grid(row=1, column=3, padx=10)
+        ctk.CTkButton(self.frm_ctrl, text="Reset Semua", fg_color="#FF4B4B", command=self.clear_all_full).grid(row=1, column=4, padx=10)
+
+        # 6. Log Output & Hasil
+        ctk.CTkLabel(self, text="Log Output & Hasil Sorting Lengkap", text_color="white", 
+                     font=ctk.CTkFont(weight="bold")).grid(row=5, column=0, padx=20, sticky="w")
+        
+        self.txt_result = ctk.CTkTextbox(self, font=("Consolas", 12))
+        self.txt_result.grid(row=6, column=0, padx=20, pady=(5, 20), sticky="nsew")
+        self.grid_rowconfigure(6, weight=1)
+
+    # --- LOGIC METHODS ---
     def generate_dataset(self):
         try:
-            n = int(self.entry_generate.get())
-            if n < 0:
-                raise ValueError
-            data = generate_room_names(n)
-            self.clear_all()
-            for item in data:
-                self.add_item(item)
-            messagebox.showinfo("Success", f"Dataset {n} item berhasil dibuat.")
+            n_text = self.entry_gen.get().strip()
+            if not n_text: return
+            n = int(n_text)
+            if n <= 0: raise ValueError
+            
+            self.data = generate_room_names(n)
+            self.update_preview()
+            
+            self.txt_result.insert("end", f"\n[GENERATED] {n} data nama ruangan baru berhasil dibuat.\n")
+            self.txt_result.insert("end", f"Data: {', '.join(self.data[:15])}{'...' if n > 15 else ''}\n")
+            self.txt_result.see("end")
         except ValueError:
-            messagebox.showerror("Error", "Input harus berupa bilangan bulat positif.")
+            messagebox.showerror("Error", "Masukkan angka jumlah data yang valid.")
 
     def add_from_entry(self):
-        text = self.entry.get().strip()
-        if not text:
-            messagebox.showwarning("Warning", "Isi dulu entry.")
-            return
-        items = [s.strip() for s in text.split(",") if s.strip()]
-        for it in items:
-            self.add_item(it)
-        self.entry.delete(0, tk.END)
+        val = self.entry.get().strip()
+        if val:
+            items = [i.strip() for i in val.split(",") if i.strip()]
+            self.data.extend(items)
+            self.update_preview()
+            self.txt_result.insert("end", f"\n[INPUT] Menambahkan data manual: {val}\n")
+            self.entry.delete(0, 'end')
 
-    def add_item(self, item):
-        self.data.append(item)
-        self.tree.insert("", "end", values=(item,))
+    def update_preview(self):
+        self.textbox_preview.delete("1.0", "end")
+        self.textbox_preview.insert("end", "\n".join(self.data))
 
     def load_from_file(self):
-        path = filedialog.askopenfilename(title="Pilih file txt/CSV", filetypes=[("Text files","*.txt *.csv"), ("All files","*.*")])
-        if not path:
-            return
-        loaded = []
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                if "," in line:
-                    parts = [p.strip() for p in line.split(",") if p.strip()]
-                    loaded.extend(parts)
-                else:
-                    loaded.append(line)
-        for it in loaded:
-            self.add_item(it)
-
-    def delete_selected(self):
-        sel = self.tree.selection()
-        if not sel:
-            messagebox.showinfo("Info", "Pilih item dulu.")
-            return
-        for s in sel:
-            val = self.tree.item(s)["values"][0]
-            try:
-                self.data.remove(val)
-            except ValueError:
-                pass
-            self.tree.delete(s)
-
-    def clear_all(self):
-        self.data = []
-        for row in self.tree.get_children():
-            self.tree.delete(row)
-
-    def clear_results(self):
-        """Clear only the results textbox."""
-        self.txt_result.delete("1.0", tk.END)
-
-    def clear_all_full(self):
-        """Clear dataset, results textbox, and history (full reset)."""
-        self.clear_all()
-        self.clear_results()
-        reset_history()
-
-    def show_count(self):
-        messagebox.showinfo("Count", f"Jumlah item: {len(self.data)}")
-
-    # Sorting runs
-    def run_iterative(self):
-        if not self.data:
-            messagebox.showwarning("Warning", "Data kosong.")
-            return
-        arr = self.data[:]
-        result, elapsed, peak_kb = measure_function(merge_sort_iterative, arr)
-        self.show_result("Iteratif (Merge Sort)", arr, result, elapsed, peak_kb)
-
-    def run_recursive(self):
-        if not self.data:
-            messagebox.showwarning("Warning", "Data kosong.")
-            return
-        arr = self.data[:]
-        result, elapsed, peak_kb = measure_function(merge_sort, arr)
-        self.show_result("Rekursif (Merge Sort)", arr, result, elapsed, peak_kb)
+        path = filedialog.askopenfilename(filetypes=[("Text files","*.txt *.csv")])
+        if path:
+            with open(path, 'r') as f:
+                for line in f:
+                    if line.strip(): self.data.append(line.strip())
+            self.update_preview()
+            self.txt_result.insert("end", f"\n[LOAD] Berhasil memuat data dari file luar.\n")
 
     def compare_both(self):
         if not self.data:
-            messagebox.showwarning("Warning", "Data kosong.")
+            messagebox.showwarning("Warning", "Dataset masih kosong!")
             return
-        arr = self.data[:]
-        r1, t1, m1 = measure_function(merge_sort_iterative, arr)
-        r2, t2, m2 = measure_function(merge_sort, arr)
+            
+        arr_to_sort = self.data[:]
+        
+        # Eksekusi Pengukuran
+        res_i, t_i, m_i = measure_function(merge_sort_iterative, arr_to_sort)
+        res_r, t_r, m_r = measure_function(merge_sort_recursive, arr_to_sort)
+        
+        # Output Log Metadata
+        self.txt_result.insert("end", f"\n{'='*65}\nHASIL PERBANDINGAN SORTING (n={len(arr_to_sort)})\n{'='*65}\n")
+        self.txt_result.insert("end", f"1. Merge Sort Iteratif: {t_i:.6f} detik | Memori: {m_i:.2f} KB\n")
+        self.txt_result.insert("end", f"2. Merge Sort Rekursif: {t_r:.6f} detik | Memori: {m_r:.2f} KB\n")
+        
+        # Menampilkan HASIL SORTING LENGKAP
+        self.txt_result.insert("end", f"\nHasil Sorting:\n")
+        self.txt_result.insert("end", f"{', '.join(res_i)}\n")
+        self.txt_result.insert("end", f"{'='*65}\n")
+        self.txt_result.see("end")
+        
+        # Simpan ke history untuk grafik
+        history_n.append(len(arr_to_sort))
+        history_time_iter.append(t_i)
+        history_time_rec.append(t_r)
 
-        self.txt_result.insert(tk.END, f"--- Comparison (n={len(arr)}) ---\n")
-        self.txt_result.insert(tk.END, f"Iteratif (Merge Sort) -> time: {t1:.6f}s, peak mem: {m1:.2f} KB\n")
-        self.txt_result.insert(tk.END, f"Result sample: {r1[:10]}\n")
-        self.txt_result.insert(tk.END, f"Rekursif (Merge)      -> time: {t2:.6f}s, peak mem: {m2:.2f} KB\n")
-        self.txt_result.insert(tk.END, f"Result sample: {r2[:10]}\n\n")
-        self.txt_result.see(tk.END)
-
-        # save to history (for plotting / analysis)
-        history_n.append(len(arr))
-        history_time_iter.append(t1)
-        history_time_rec.append(t2)
-
-    def show_result(self, method_name, original, sorted_result, elapsed, peak_kb):
-        self.txt_result.insert(tk.END, f"--- {method_name} ---\n")
-        self.txt_result.insert(tk.END, f"Input ({len(original)}): {original[:20]}\n")
-        self.txt_result.insert(tk.END, f"Sorted ({len(sorted_result)}): {sorted_result[:50]}\n")
-        self.txt_result.insert(tk.END, f"Waktu eksekusi: {elapsed:.6f} detik\n")
-        self.txt_result.insert(tk.END, f"Peak memory: {peak_kb:.2f} KB\n\n")
-        self.txt_result.see(tk.END)
-
-    def export_csv(self):
-        if not self.data:
-            messagebox.showwarning("Warning", "Data kosong — tidak ada hasil untuk diekspor.")
+    def show_analysis(self):
+        if not history_n:
+            messagebox.showerror("Error", "Belum ada riwayat eksperimen untuk dianalisis.")
             return
-        path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files","*.csv"), ("All files","*.*")])
-        if not path:
-            return
-        with open(path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["nama_ruangan"])
-            for it in self.data:
-                writer.writerow([it])
-        messagebox.showinfo("Export", f"Data disimpan ke {path}")
+        
+        # Hitung rata-rata waktu
+        avg_i = sum(history_time_iter) / len(history_time_iter)
+        avg_r = sum(history_time_rec) / len(history_time_rec)
+        
+        # Tentukan kesimpulan
+        if avg_i < avg_r:
+            selisih = avg_r - avg_i
+            kesimpulan = f"KESIMPULAN:\nMetode ITERATIF lebih cepat sekitar {selisih:.6f} detik dibandingkan metode Rekursif pada dataset ini."
+        elif avg_r < avg_i:
+            selisih = avg_i - avg_r
+            kesimpulan = f"KESIMPULAN:\nMetode REKURSIF lebih cepat sekitar {selisih:.6f} detik dibandingkan metode Iteratif pada dataset ini."
+        else:
+            kesimpulan = "KESIMPULAN:\nKedua metode memiliki performa waktu yang identik."
 
-# Run app
+        # Tampilkan dalam MessageBox
+        messagebox.showinfo("Analisis Perbandingan Algoritma", 
+                            f"Hasil Rata-rata Pengujian (n={sum(history_n)/len(history_n):.0f} data):\n\n"
+                            f"• Rata-rata Iteratif : {avg_i:.6f} detik\n"
+                            f"• Rata-rata Rekursif : {avg_r:.6f} detik\n\n"
+                            f"{kesimpulan}")
+        
+        # Tambahkan juga ke Log Output agar terekam
+        self.txt_result.insert("end", f"\n[ANALISIS] {kesimpulan.replace('KESIMPULAN:', '')}\n")
+        self.txt_result.see("end")
+
+    def show_plot(self):
+        if not history_n: return
+        plt.figure("Analisis Performa Merge Sort")
+        # Sort data berdasarkan n agar garis grafik tidak berantakan
+        sn, si, sr = zip(*sorted(zip(history_n, history_time_iter, history_time_rec)))
+        plt.plot(sn, si, marker='o', linestyle='-', color='blue', label="Iteratif")
+        plt.plot(sn, sr, marker='s', linestyle='-', color='red', label="Rekursif")
+        plt.xlabel("Jumlah Data (n)")
+        plt.ylabel("Waktu Eksekusi (detik)")
+        plt.title("Grafik Perbandingan Waktu: Iteratif vs Rekursif")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    def open_visualization(self):
+        try:
+            subprocess.Popen(["python", "merge_sort_side_by_side.py"])
+        except Exception as e:
+            messagebox.showerror("Error", f"Gagal menjalankan file visualisasi: {e}")
+
+    def clear_all(self):
+        self.data = []
+        self.update_preview()
+        self.txt_result.insert("end", "\n[CLEAR] Dataset preview telah dibersihkan.\n")
+
+    def clear_all_full(self):
+        self.clear_all()
+        self.txt_result.delete("1.0", "end")
+        self.entry_gen.delete(0, 'end')
+        global history_n, history_time_iter, history_time_rec
+        history_n, history_time_iter, history_time_rec = [], [], []
+
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = SortingApp(root)
-    root.mainloop()
+    app = SortingAppModern()
+    app.mainloop()
