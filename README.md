@@ -32,14 +32,24 @@ Sebelum menjalankan aplikasi, pastikan Anda telah menginstal Python (versi 3.10 
 1. Clone Repositori:
    - git clone https://github.com/Rizkivoker/tubes-aka-sorting-analysis.git
 
-2. Jalankan Aplikasi Utama:
+2. Buat Virtual Environment untuk menjalankan aplikasi
+   Jalankan command/perintah berikut di terminal dan direktori aplikasi yang benar
+   - python -m venv venv 
+   - venv\Scripts\activate 
+
+3. Jalankan Aplikasi Utama:
    - python sorting_gui.py
-  
+   - lakukan generate data sebanyak n data, lalu lakukan Compare Both untuk membandingkan merge sort rekursif dengan iteratif
+   - tampilkan grafik perbandingan setelah melakukan Compare Both lebih dari 1 kali untuk melihat perbandingan
+   - Analisis perbandingan menampilkan hasil dari pengujian yang dilakukan pengguna
+   - Visualisasi Merge Sort berfungsi untuk memvisualisasikan perbandingan antara algoritma Merge Sort Rekursif dengan Iteratif dengan cara input n data di window aplikasi
+
 📊 **Hasil Analisis**
 Berdasarkan pengujian yang dilakukan, algoritma akan memberikan output berupa:
 - Waktu eksekusi dalam satuan milidetik.
 - Puncak penggunaan memori (Peak Memory).
 - Grafik tren performa seiring bertambahnya jumlah n data
+
 
 💻 **Project Overview**
 Proyek ini adalah kumpulan skrip Python untuk menganalisis dan memvisualisasikan perbandingan algoritma Merge Sort (rekursif vs iteratif) pada data nama ruangan. Terdapat utilitas generator dataset, GUI untuk eksperimen dan pencatatan metrik, serta dua visualisasi real-time berbasis Pygame.
