@@ -22,6 +22,12 @@ Aplikasi ini bertujuan untuk membandingkan efisiensi waktu eksekusi dan pengguna
 Sebelum menjalankan aplikasi, pastikan Anda telah menginstal Python (versi 3.10 atau lebih baru) dan library berikut:
 - pip install customtkinter pygame matplotlib numpy
 
+Aplikasi yang dibuat menggunakan library :
+- customtkinter
+- pygame
+- matplotlib
+- numpy
+
 📂 **Struktur File**
 - sorting_gui.py: File utama untuk menjalankan aplikasi GUI modern.
 - merge_sort_side_by_side.py: Program visualisasi Pygame (Rekursif vs Iteratif).
