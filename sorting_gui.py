@@ -16,15 +16,15 @@ except ImportError:
         prefixes = ["Ruang", "Lab", "A", "B", "R"]
         return [f"{random.choice(prefixes)}.{random.randint(1, 500)}" for _ in range(n)]
 
-# --- Konfigurasi Tema ---
+#  Konfigurasi Tema 
 ctk.set_appearance_mode("dark")  
 ctk.set_default_color_theme("blue") 
 
-# --- FUNGSI PEMBANDING (NATURAL SORTING) ---
+#  FUNGSI PEMBANDING (NATURAL SORTING) 
 def natural_keys(text):
     return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', text)]
 
-# --- ALGORITMA SORTING ---
+#  ALGORITMA SORTING 
 def merge_sort_recursive(arr):
     if len(arr) <= 1: return arr[:]
     mid = len(arr) // 2
@@ -61,7 +61,7 @@ def merge_sort_iterative(arr):
         width *= 2
     return result
 
-# --- GLOBAL HISTORY UNTUK GRAFIK ---
+# GLOBAL HISTORY UNTUK GRAFIK 
 history_n = []
 history_time_iter = []
 history_time_rec = []
@@ -101,9 +101,21 @@ class SortingAppModern(ctk.CTk):
         self.entry = ctk.CTkEntry(self.frm_input, placeholder_text="Contoh: Ruang 1, Ruang 2", width=450)
         self.entry.grid(row=1, column=0, padx=10, pady=10)
         
-        ctk.CTkButton(self.frm_input, text="Tambah Data", command=self.add_from_entry).grid(row=1, column=1, padx=5)
-        ctk.CTkButton(self.frm_input, text="Load File", command=self.load_from_file).grid(row=1, column=2, padx=5)
-        ctk.CTkButton(self.frm_input, text="Clear Dataset", fg_color="transparent", border_width=1, command=self.clear_all).grid(row=1, column=3, padx=5)
+        # Tombol Tambah Data
+        ctk.CTkButton(self.frm_input, text="Tambah Data", font=ctk.CTkFont(weight="bold"), 
+                     fg_color="#1F538D", hover_color="#00BFFF", 
+                     text_color="white", border_width=2, border_color="#FFFFFF",
+                     command=self.add_from_entry).grid(row=1, column=1, padx=5)
+        
+        # Tombol Load File
+        ctk.CTkButton(self.frm_input, text="Load File", font=ctk.CTkFont(weight="bold"), 
+                     fg_color="#1F538D", hover_color="#00BFFF", 
+                     text_color="white", border_width=2, border_color="#FFFFFF",
+                     command=self.load_from_file).grid(row=1, column=2, padx=5)
+        
+        # Tombol Clear Dataset
+        ctk.CTkButton(self.frm_input, text="Clear Dataset", fg_color="transparent", border_width=1, 
+                     command=self.clear_all).grid(row=1, column=3, padx=5)
 
         # 3. Frame Generator Dataset Otomatis
         self.frm_gen = ctk.CTkFrame(self)
@@ -115,7 +127,11 @@ class SortingAppModern(ctk.CTk):
         self.entry_gen = ctk.CTkEntry(self.frm_gen, placeholder_text="Masukkan jumlah n data", width=200)
         self.entry_gen.grid(row=1, column=0, padx=10, pady=10, sticky="w")
         
-        ctk.CTkButton(self.frm_gen, text="Generate Data", command=self.generate_dataset).grid(row=1, column=1, padx=5, sticky="w")
+        # Tombol Generate Data
+        ctk.CTkButton(self.frm_gen, text="Generate Data", font=ctk.CTkFont(weight="bold"), 
+                     fg_color="#1F538D", hover_color="#00BFFF", 
+                     text_color="white", border_width=2, border_color="#FFFFFF",
+                     command=self.generate_dataset).grid(row=1, column=1, padx=5, sticky="w")
 
         # 4. Frame Preview Data
         self.frm_preview = ctk.CTkFrame(self)
@@ -134,11 +150,49 @@ class SortingAppModern(ctk.CTk):
         ctk.CTkLabel(self.frm_ctrl, text="Sorting & Pengukuran", text_color="white", 
                      font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w", columnspan=5)
 
-        ctk.CTkButton(self.frm_ctrl, text="Compare Both", command=self.compare_both).grid(row=1, column=0, padx=10, pady=10)
-        ctk.CTkButton(self.frm_ctrl, text="Tampilkan Grafik", command=self.show_plot).grid(row=1, column=1, padx=10)
-        ctk.CTkButton(self.frm_ctrl, text="Analisis Perbandingan", command=self.show_analysis).grid(row=1, column=2, padx=10)
-        ctk.CTkButton(self.frm_ctrl, text="Visualisasi Merge Sort", fg_color="#FFD700", text_color="black", command=self.open_visualization).grid(row=1, column=3, padx=10)
-        ctk.CTkButton(self.frm_ctrl, text="Reset Semua", fg_color="#FF4B4B", command=self.clear_all_full).grid(row=1, column=4, padx=10)
+        # Tombol Compare Both
+        ctk.CTkButton(self.frm_ctrl, text="Compare Both", font=ctk.CTkFont(weight="bold"),
+                     fg_color="#1F538D", hover_color="#00BFFF", 
+                     text_color="white", border_width=2, border_color="#FFFFFF",
+                     command=self.compare_both).grid(row=1, column=0, padx=10, pady=10)
+
+        # Tombol Tampilkan Grafik
+        ctk.CTkButton(self.frm_ctrl, text="Tampilkan Grafik", font=ctk.CTkFont(weight="bold"),
+                     fg_color="#1F538D", hover_color="#00BFFF", 
+                     text_color="white", border_width=2, border_color="#FFFFFF",
+                     command=self.show_plot).grid(row=1, column=1, padx=10)
+
+        # Tombol Analisis Perbandingan
+        ctk.CTkButton(self.frm_ctrl, text="Analisis Perbandingan", font=ctk.CTkFont(weight="bold"),
+                     fg_color="#1F538D", hover_color="#00BFFF", 
+                     text_color="white", border_width=2, border_color="#FFFFFF",
+                     command=self.show_analysis).grid(row=1, column=2, padx=10)
+
+        # Tombol Visualisasi 
+        ctk.CTkButton(
+            self.frm_ctrl, 
+            text="Visualisasi Merge Sort", 
+            fg_color="#FFD700",      #FFFF00    FFD700
+            hover_color="#FFFF00",   #B8860B
+            text_color="black", 
+            font=ctk.CTkFont(weight="bold"), 
+            border_width=2, 
+            border_color="#FFFFFF", 
+            command=self.open_visualization
+        ).grid(row=1, column=3, padx=10)
+
+        # Tombol Reset 
+        ctk.CTkButton(
+            self.frm_ctrl, 
+            text="Reset Semua", 
+            fg_color="#8B0000",      
+            hover_color="#FF4B4B",   
+            text_color="white",      
+            font=ctk.CTkFont(weight="bold"), 
+            border_width=2, 
+            border_color="#FFFFFF", 
+            command=self.clear_all_full
+        ).grid(row=1, column=4, padx=10)
 
         # 6. Log Output & Hasil
         ctk.CTkLabel(self, text="Log Output & Hasil Sorting Lengkap", text_color="white", 
@@ -148,7 +202,7 @@ class SortingAppModern(ctk.CTk):
         self.txt_result.grid(row=6, column=0, padx=20, pady=(5, 20), sticky="nsew")
         self.grid_rowconfigure(6, weight=1)
 
-    # --- LOGIC METHODS ---
+    # LOGIC METHODS 
     def generate_dataset(self):
         try:
             n_text = self.entry_gen.get().strip()
